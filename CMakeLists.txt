@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.10)
 
 project(livox_sdk)
 
@@ -13,7 +13,7 @@ if (CMAKE_CROSSCOMPILING)
 endif()
 
 if (UNIX)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wno-error=c++20-compat -Wno-c++20-compat")
 endif(UNIX)
 
 add_subdirectory(sdk_core sdk_core)
