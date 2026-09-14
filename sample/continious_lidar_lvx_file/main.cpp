@@ -28,6 +28,8 @@
 #include "cmdline.h"
 #include <thread>
 #include <ctime>
+#include <atomic>
+std::atomic<bool> is_working_hours_flag{false};
 
 DeviceItem devices[kMaxLidarCount];
 LvxFileHandle lvx_file_handler;
@@ -80,7 +82,7 @@ void OnLidarErrorStatusCallback(livox_status status, uint8_t handle, ErrorMessag
 /** Receiving point cloud data from Livox LiDAR. */
 void GetLidarData(uint8_t handle, LivoxEthPacket *data, uint32_t data_num, void *client_data) {
   if (data) {
-    if (handle < connected_lidar_count && is_finish_extrinsic_parameter) {
+    if (handle < connected_lidar_count && is_finish_extrinsic_parameter && is_working_hours_flag) {
       std::unique_lock<std::mutex> lock(mtx);
       LvxBasePackDetail packet;
       packet.device_index = handle;
@@ -389,9 +391,18 @@ int main(int argc, const char *argv[]) {
   while (true) {
     if(not is_within_working_hours())
     {
+      // Stop accepting new packets
+      is_working_hours_flag = false;
+      {
+        std::unique_lock<std::mutex> lock(mtx);
+        point_packet_list.clear();
+      }
       std::this_thread::sleep_for(std::chrono::seconds(60));
       continue;
     }
+
+    // Start accepting packets again
+    is_working_hours_flag = true;
     printf("Start initialize lvx file.\n");
     
     // Reseting file handler info data
