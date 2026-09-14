@@ -27,6 +27,7 @@
 #include "lvx_file.h"
 #include "cmdline.h"
 #include <thread>
+#include <ctime>
 
 DeviceItem devices[kMaxLidarCount];
 LvxFileHandle lvx_file_handler;
@@ -318,6 +319,28 @@ void SetProgramOption(int argc, const char *argv[]) {
   return;
 }
 
+bool is_within_working_hours() {
+    // 1. Get current time point
+    std::time_t raw_time = std::time(nullptr);
+
+    // 2. Convert to local time structure
+    std::tm* local_time = std::localtime(&raw_time);
+
+    // tm_wday: 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    int day = local_time->tm_wday;
+
+    // tm_hour: 0 to 23
+    int hour = local_time->tm_hour;
+
+    // Check if Mon-Fri (1 to 5)
+    bool is_weekday = (day >= 1 && day <= 5);
+
+    // Check if between 7:00 AM and 4:00 PM (16:00)
+    bool is_in_time_window = (hour >= 7 && hour < 16);
+
+    return is_weekday && is_in_time_window;
+}
+
 int main(int argc, const char *argv[]) {
 /** Set the program options. */
   SetProgramOption(argc, argv);
@@ -355,7 +378,7 @@ int main(int argc, const char *argv[]) {
   AddDevicesToConnect();
 
   if (connected_lidar_count == 0) {
-    printf("No device will be connected.\n");
+    printf("No device is connected.\n");
     Uninit();
     return -1;
   }
@@ -364,9 +387,14 @@ int main(int argc, const char *argv[]) {
   
   // --- CONTINUOUS RECORDING LOGIC ---
   while (true) {
+    if(not is_within_working_hours())
+    {
+      std::this_thread::sleep_for(std::chrono::seconds(60));
+      continue;
+    }
     printf("Start initialize lvx file.\n");
     
-    // DO NOT call lvx_file_handler.reset(); It wipes the LiDAR info needed for the header!
+    // Reseting file handler info data
     lvx_file_handler.reset();
     if (!lvx_file_handler.InitLvxFile()) {
       printf("Failed to initialize lvx file. Stopping recording.\n");
