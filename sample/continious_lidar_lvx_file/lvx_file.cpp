@@ -28,6 +28,7 @@
 #include "lvx_file.h"
 #include "third_party/rapidxml/rapidxml.hpp"
 #include "third_party/rapidxml/rapidxml_utils.hpp"
+#include <sys/stat.h>
 
 #define WRITE_BUFFER_LEN 1024 * 1024
 #define MAGIC_CODE       (0xac0ea767)
@@ -43,10 +44,16 @@ LvxFileHandle::LvxFileHandle() : cur_frame_index_(0), cur_offset_(0), frame_dura
 
 bool LvxFileHandle::InitLvxFile() {
   time_t curtime = time(nullptr);
-  char filename[30] = { 0 };
+  char foldername[64] = { 0 };
+  char filename[128] = { 0 };
+
+  mkdir("lidar_recording", 0777);
 
   tm* local_time = localtime(&curtime);
-  strftime(filename, sizeof(filename), "%Y-%m-%d_%H-%M-%S.lvx", local_time);
+  strftime(foldername, sizeof(foldername), "lidar_recording/%Y-%m-%d", local_time);
+  mkdir(foldername, 0777);
+
+  strftime(filename, sizeof(filename), "lidar_recording/%Y-%m-%d/%H-%M-%S.lvx", local_time);
   lvx_file_.open(filename, std::ios::out | std::ios::binary);
 
   if (!lvx_file_.is_open()) {
