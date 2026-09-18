@@ -343,6 +343,30 @@ bool is_within_working_hours() {
     return is_weekday && is_in_time_window;
 }
 
+LidarMode get_desired_lidar_mode() {
+    std::time_t raw_time = std::time(nullptr);
+    std::tm* local_time = std::localtime(&raw_time);
+
+    int day = local_time->tm_wday;
+    int hour = local_time->tm_hour;
+    int min = local_time->tm_min;
+
+    bool is_weekday = (day >= 1 && day <= 5);
+    if (!is_weekday) {
+        return kLidarModeStandby;
+    }
+
+    int time_in_minutes = hour * 60 + min;
+    int start_time = 6 * 60 + 50; // 06:50
+    int end_time = 16 * 60 + 10;  // 16:10
+
+    if (time_in_minutes >= start_time && time_in_minutes < end_time) {
+        return kLidarModeNormal;
+    } else {
+        return kLidarModePowerSaving;
+    }
+}
+
 int main(int argc, const char *argv[]) {
 /** Set the program options. */
   SetProgramOption(argc, argv);
@@ -386,9 +410,33 @@ int main(int argc, const char *argv[]) {
   }
 
   WaitForExtrinsicParameter();
+
+  LidarMode device_current_mode[kMaxLidarCount];
+  for (size_t i = 0; i < kMaxLidarCount; ++i) {
+      device_current_mode[i] = (LidarMode)0;
+  }
   
   // --- CONTINUOUS RECORDING LOGIC ---
   while (true) {
+    LidarMode desired_mode = get_desired_lidar_mode();
+
+    for (size_t i = 0; i < kMaxLidarCount; ++i) {
+      if (devices[i].device_state != kDeviceStateDisconnect) {
+        if (device_current_mode[i] != desired_mode) {
+          LidarSetMode(devices[i].handle, desired_mode, nullptr, nullptr);
+          device_current_mode[i] = desired_mode;
+          if (desired_mode == kLidarModeStandby) {
+            printf("LiDAR %zu mode changed to Standby.\n", i);
+          } else if (desired_mode == kLidarModeNormal) {
+            printf("LiDAR %zu mode changed to Normal.\n", i);
+          }
+        }
+      } else {
+        // Clear state so that upon reconnection it receives the correct command immediately.
+        device_current_mode[i] = (LidarMode)0;
+      }
+    }
+
     if(not is_within_working_hours())
     {
       // Stop accepting new packets
