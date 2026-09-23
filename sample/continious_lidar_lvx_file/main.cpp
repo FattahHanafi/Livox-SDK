@@ -463,16 +463,16 @@ int main(int argc, const char *argv[]) {
     // This writes the LiDAR info (saved during startup) into the new file's header
     lvx_file_handler.InitLvxFileHeader(); 
 
-    printf("Recording standard frames for 3000 ms...\n");
+    printf("Recording standard frames for 10 s...\n");
 
     steady_clock::time_point file_start_time = steady_clock::now();
     steady_clock::time_point last_time = file_start_time;
 
-    // Inner loop: Save standard 50ms frames until 3000ms is reached
+    // Inner loop: Save standard 50ms frames until 10000ms is reached
     while (true) {
-      // Check if 3 seconds have passed
+      // Check if 10 seconds have passed
       auto elapsed_ms = duration_cast<milliseconds>(steady_clock::now() - file_start_time).count();
-      if (elapsed_ms >= 3000) {
+      if (elapsed_ms >= 10000) {
         break; // Break the inner loop to close this file
       }
 
@@ -499,8 +499,20 @@ int main(int argc, const char *argv[]) {
     }
 
     // Close the file properly so the viewer can read the end-of-file markers
-    printf("Closing current file and generating a new one...\n");
+    printf("Closing current file...\n");
     lvx_file_handler.CloseLvxFile();
+
+    printf("Waiting 50 seconds before next recording...\n");
+    is_working_hours_flag = false;
+
+    // Clear any packets that arrived at the last millisecond
+    {
+      std::unique_lock<std::mutex> lock(mtx);
+      point_packet_list.clear();
+    }
+
+    // Sleep for 50 seconds while the LiDAR spins but data is discarded
+    std::this_thread::sleep_for(std::chrono::seconds(50));
   }
   // ----------------------------------
 
